@@ -1,3 +1,5 @@
+import { isIPv4 } from "node:net";
+
 export interface BaseUrlValidationResult {
   ok: boolean;
   value?: string;
@@ -26,7 +28,13 @@ export function readBooleanValue(...values: unknown[]): boolean | undefined {
 
 function isLocalHostname(hostname: string): boolean {
   const normalized = hostname.toLowerCase();
-  return LOCAL_HOSTNAMES.has(normalized) || normalized.startsWith("127.");
+  return LOCAL_HOSTNAMES.has(normalized) || (isIPv4(normalized) && normalized.startsWith("127."));
+}
+
+function isPrivateNetworkHostname(hostname: string): boolean {
+  if (!isIPv4(hostname)) return false;
+  const [first, second] = hostname.split(".").map(Number);
+  return first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168);
 }
 
 function isBlockedMetadataHostname(hostname: string): boolean {
@@ -34,7 +42,7 @@ function isBlockedMetadataHostname(hostname: string): boolean {
   return normalized === "169.254.169.254" || normalized.startsWith("169.254.") || normalized === "metadata.google.internal";
 }
 
-export function validateBaseUrl(value: string, options: { allowLocalHttp?: boolean } = {}): BaseUrlValidationResult {
+export function validateBaseUrl(value: string, options: { allowLocalHttp?: boolean; allowPrivateHttp?: boolean } = {}): BaseUrlValidationResult {
   let parsed: URL;
   try {
     parsed = new URL(value);
@@ -54,8 +62,11 @@ export function validateBaseUrl(value: string, options: { allowLocalHttp?: boole
   if (isBlockedMetadataHostname(parsed.hostname)) {
     return { ok: false, reason: "baseUrl host is not allowed for discovery" };
   }
-  if (parsed.protocol === "http:" && !(options.allowLocalHttp && isLocalHostname(parsed.hostname))) {
-    return { ok: false, reason: "baseUrl must use https unless the host is local development" };
+  const httpHostAllowed =
+    (options.allowLocalHttp === true && isLocalHostname(parsed.hostname)) ||
+    (options.allowPrivateHttp === true && isPrivateNetworkHostname(parsed.hostname));
+  if (parsed.protocol === "http:" && !httpHostAllowed) {
+    return { ok: false, reason: "baseUrl must use https unless the host is local development (or a private-network IP with allowPrivateHttp enabled)" };
   }
 
   return { ok: true, value: parsed.toString().replace(/\/$/, "") };

@@ -23,6 +23,16 @@
 
 ## Installation
 
+### Remote-host fork branch
+
+Install this fork’s remote-host implementation with:
+
+```bash
+pi install git:github.com/cashxcode/pi-model-discovery@remote-host-support
+```
+
+If replacing the npm version, back up its `config.json` outside the package directory first, then run `pi remove npm:pi-model-discovery` to avoid loading both copies. Restore your config in the fork’s extension directory and add `allowPrivateHttp` to the LAN provider as shown below. The npm package and upstream repository commands below install the original release.
+
 ### npm package
 
 ```bash
@@ -82,7 +92,32 @@ By default, `config.json` can leave `providers` empty. With `autoImport.enabled`
 
 Manual `providers` remain supported for custom endpoints or overrides. Explicit providers take precedence over auto-imported providers with the same ID. Keep manual secrets in environment variables with `${ENV_VAR}` references; do not place raw keys in config files. `debug` defaults to `false`; when enabled, logs are written only to `debug/debug.log` in this extension directory.
 
-`baseUrl` values are validated before any network request. Use `https:` for remote providers; `http:` is accepted only for localhost/127.x development endpoints such as Ollama, LM Studio, or local proxies. URLs with credentials, query strings, fragments, or known metadata-service hosts are rejected.
+`baseUrl` values are validated before any network request. Use `https:` for remote providers; `http:` is accepted only for localhost/127.x development endpoints such as Ollama, LM Studio, or local proxies. URLs with credentials, query strings, fragments, or known metadata-service hosts are rejected. To use a server on another machine over plain `http:`, set `allowPrivateHttp: true` on that provider (default `false`); it permits only private-network IPv4 addresses (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), and public hosts still require `https:`.
+
+### A model server on another machine
+
+For Pi on a laptop connecting to an OpenAI-compatible LAN server, add an explicit provider in `config.json`:
+
+```json
+{
+  "providers": [
+    {
+      "id": "mlx-serve",
+      "baseUrl": "http://192.168.1.20:11234/v1",
+      "allowPrivateHttp": true,
+      "api": "openai-completions",
+      "apiKey": "${MLX_SERVE_API_KEY}",
+      "discovery": { "type": "openai-compat" }
+    }
+  ]
+}
+```
+
+Replace the example IP with your server's LAN IPv4 address and set `MLX_SERVE_API_KEY` in the environment that launches Pi. The server must listen on its LAN interface, and its port must be reachable from the laptop. Restart Pi or run `/reload`, then use `/pi-model-discovery` and `/model` to inspect and select a discovered model.
+
+`allowPrivateHttp` must be the JSON boolean `true`, applies only to that explicit provider, and defaults to `false`. Auto-import does not opt in; define an explicit provider with the same ID to override it. Private DNS names (including `.local`), private IPv6, and public HTTP endpoints are not enabled by this option. Existing localhost, IPv4 loopback, IPv6 loopback, and HTTPS configurations need no changes.
+
+HTTP sends API keys, prompts, and responses without encryption. Use this option only on a trusted network; use HTTPS or an SSH tunnel for encrypted transport. This flag validates the configured base URL; it is not a network firewall or a redirect policy.
 
 Use `providers[].discovery.allowModels` and `providers[].discovery.blockModels` as substring filters on discovered model IDs. Discovery is uncapped by default; set top-level `maxModels` or `providers[].maxModels` only when you want an explicit positive model limit. Use `providers[].modelDefaults` for explicit per-model metadata overrides and `providers[].fallbackModelIds` when a provider should still register known models after discovery fails and no cache exists.
 

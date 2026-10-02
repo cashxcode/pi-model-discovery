@@ -175,9 +175,14 @@
           "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
           "baseUrl": {
             "type": "string",
-            "description": "Absolute http(s) URL. HTTPS is required except localhost/127.x local-development endpoints; credentials, query strings, fragments, and metadata-service hosts are rejected."
+            "description": "Absolute http(s) URL. HTTPS is required except localhost/loopback endpoints or RFC 1918 IPv4 addresses with allowPrivateHttp enabled; credentials, query strings, fragments, and metadata-service hosts are rejected."
           },
           "apiKey": { "type": "string" },
+          "allowPrivateHttp": {
+            "type": "boolean",
+            "default": false,
+            "description": "Opt in to plain http:// for this provider when baseUrl is a private-network IPv4 address (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16). Public hosts still require https; loopback and metadata-service rules are unchanged."
+          },
           "api": { "type": "string" },
           "authHeader": { "type": "boolean", "default": true },
           "headers": { "type": "object", "additionalProperties": { "type": "string" } },

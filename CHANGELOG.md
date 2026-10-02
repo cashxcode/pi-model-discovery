@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added an opt-in per-provider `allowPrivateHttp` flag that permits plain `http:` base URLs on private-network IPv4 addresses (RFC 1918). Default is off; public hosts and metadata-service hosts are unchanged.
+
+### Fixed
+- Restrict the IPv4 loopback exception to actual IP addresses instead of hostnames beginning with `127.`.
+- Use local TypeScript dependencies and synchronize the lockfile with existing dependency overrides so a fresh clone can run checks.
+
 ## [0.3.0] - 2026-07-03
 
 ### Added

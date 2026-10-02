@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -187,4 +187,34 @@ test("targeted cache pruning preserves skipped auto-import cache entries", async
   assert.deepEqual(await manager.pruneProviderIds(new Set(["excluded"])), ["excluded"]);
   assert.equal(manager.read().providers.excluded, undefined);
   assert.equal(manager.read().providers.skippedAutoImport?.models[0]?.id, "gpt-live");
+});
+
+test("private-network http baseUrl is rejected by default and accepted only with allowPrivateHttp", (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "pmd-private-http-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const modelsJsonPath = join(dir, "models.json");
+  const authJsonPath = join(dir, "auth.json");
+  writeJson(modelsJsonPath, { providers: {} });
+  writeJson(authJsonPath, {});
+
+  const providersFor = (baseUrl: string, extra: Record<string, unknown> = {}) => {
+    const configPath = join(dir, "config.json");
+    writeJson(configPath, {
+      autoImport: { enabled: false },
+      providers: [
+        { id: "lan-provider", baseUrl, api: "openai-completions", apiKey: TEST_API_KEY, discovery: { type: "openai-compat" }, ...extra },
+      ],
+    });
+    return loadConfig({ extensionRoot: dir, configPath, modelsJsonPath, authJsonPath }).config.providers;
+  };
+
+  assert.equal(providersFor("http://10.120.1.20:11234/v1").length, 0);
+  const accepted = providersFor("http://10.120.1.20:11234/v1", { allowPrivateHttp: true });
+  assert.equal(accepted.length, 1);
+  assert.equal(accepted[0]?.baseUrl, "http://10.120.1.20:11234/v1");
+  assert.equal(providersFor("http://192.168.1.5:8080/v1", { allowPrivateHttp: true }).length, 1);
+  assert.equal(providersFor("http://172.20.0.1/v1", { allowPrivateHttp: true }).length, 1);
+  assert.equal(providersFor("http://172.32.0.1/v1", { allowPrivateHttp: true }).length, 0);
+  assert.equal(providersFor("http://8.8.8.8/v1", { allowPrivateHttp: true }).length, 0);
+  assert.equal(providersFor("http://169.254.169.254/v1", { allowPrivateHttp: true }).length, 0);
 });

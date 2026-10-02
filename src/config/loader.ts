@@ -557,13 +557,13 @@ function normalizeProviderDiscovery(
   } satisfies ProviderDiscoveryConfig;
 }
 
-function normalizeBaseUrl(rawBaseUrl: unknown, warnings: string[], label: string, providerId: string): string | undefined {
+function normalizeBaseUrl(rawBaseUrl: unknown, warnings: string[], label: string, providerId: string, allowPrivateHttp = false): string | undefined {
   const baseUrl = typeof rawBaseUrl === "string" ? rawBaseUrl.trim() : "";
   if (!baseUrl) {
     warnings.push(`${label}.baseUrl is required; skipping provider ${providerId}.`);
     return undefined;
   }
-  const validation = validateBaseUrl(baseUrl, { allowLocalHttp: true });
+  const validation = validateBaseUrl(baseUrl, { allowLocalHttp: true, allowPrivateHttp });
   if (!validation.ok || !validation.value) {
     warnings.push(`${label}.baseUrl ${validation.reason ?? "is invalid"}; skipping provider ${providerId}.`);
     return undefined;
@@ -612,7 +612,7 @@ function normalizeProvider(
     warnings.push(`Provider ID '${id}' matches agent/models.json; existing credential extensions may manage that provider.`);
   }
 
-  const baseUrl = normalizeBaseUrl(rawProvider.baseUrl, warnings, label, id);
+  const baseUrl = normalizeBaseUrl(rawProvider.baseUrl, warnings, label, id, rawProvider.allowPrivateHttp === true);
   if (!baseUrl) return undefined;
 
   const api = typeof rawProvider.api === "string" ? rawProvider.api : "";
