@@ -261,3 +261,24 @@ test("URL and discovery headers are built without mutating provider metadata", (
   assert.equal(headers["x-runtime"], "enabled");
   assert.equal(headers["x-discovery"], "enabled");
 });
+
+
+test("OpenAI context metadata uses effective server limits and ignores invalid values", () => {
+  const cases = [
+    { fields: { context_length: 1048576, max_model_len: 262144, meta: { context_length: 131072, model_max_tokens: 262144 } }, expected: 1048576 },
+    { fields: { max_model_len: 262144 }, expected: 262144 },
+    { fields: { meta: { context_length: 524288 } }, expected: 524288 },
+    { fields: { context_length: "1048576" }, expected: 1048576 },
+    { fields: { context_length: 0, max_model_len: 262144 }, expected: 262144 },
+    { fields: { meta: { model_max_tokens: 262144 } }, expected: undefined },
+  ];
+  for (const { fields, expected } of cases) {
+    const model = parseOpenAIModelsResponse({ data: [{ id: "mlx-chat", ...fields }] }, provider)[0]!;
+    assert.equal(model.defaults?.contextWindow, expected);
+    assert.equal(model.defaults?.maxTokens, undefined);
+  }
+  for (const value of [0, -1, 1.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1, "", "invalid", null, true, {}, []]) {
+    const model = parseOpenAIModelsResponse({ data: [{ id: "mlx-chat", context_length: value }] }, provider)[0]!;
+    assert.equal(model.defaults?.contextWindow, undefined, String(value));
+  }
+});

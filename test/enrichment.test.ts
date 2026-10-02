@@ -1,4 +1,5 @@
 import test from "node:test";
+import { parseOpenAIModelsResponse } from "../src/discovery/openai-compat.js";
 import assert from "node:assert/strict";
 
 import type { DiscoveredModel } from "../src/cache/types.js";
@@ -487,4 +488,21 @@ test("endpoint pricing hints override catalog pricing when provider account expo
       { id: "premium-provider-model", isFree: false, endpointPricing: true },
     ],
   );
+});
+
+
+test("refreshed server context replaces cached limits in both directions while explicit overrides win", () => {
+  const remoteProvider = { ...provider, defaults: {}, modelDefaults: {} };
+  const response = (context_length: number) => parseOpenAIModelsResponse({ data: [{ id: "mlx-chat", context_length }] }, remoteProvider);
+  let cached = enrichProviderModels(remoteProvider, response(262144), new Map());
+  for (const limit of [1048576, 131072]) {
+    cached = enrichProviderModels(remoteProvider, response(limit), new Map(), cached);
+    assert.equal(cached[0]?.contextWindow, limit);
+    assert.equal(cached[0]?.capabilityProvenance?.contextWindow, "endpointDetails");
+  }
+  const overridden = { ...remoteProvider, modelDefaults: { "mlx-chat": { contextWindow: 1000000 } } };
+  cached = enrichProviderModels(overridden, response(524288), new Map(), cached);
+  assert.equal(cached[0]?.contextWindow, 1000000);
+  cached = enrichProviderModels(remoteProvider, response(524288), new Map(), cached);
+  assert.equal(cached[0]?.contextWindow, 524288);
 });

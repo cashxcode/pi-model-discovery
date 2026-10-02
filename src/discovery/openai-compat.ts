@@ -23,6 +23,9 @@ interface OpenAIModelEntry {
   tags?: unknown;
   task?: unknown;
   properties?: unknown;
+  context_length?: unknown;
+  max_model_len?: unknown;
+  meta?: unknown;
   source?: unknown;
   supports?: unknown;
   output_modalities?: unknown;
@@ -141,6 +144,16 @@ function readPositiveIntegerish(value: unknown): number | undefined {
   if (typeof value !== "string") return undefined;
   const parsed = Number(value.trim());
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/** Prefer the server's effective context limit; model_max_tokens is not an output limit. */
+function readContextDefaults(entry: OpenAIModelEntry): DiscoveryDefaults | undefined {
+  const meta = isRecord(entry.meta) ? entry.meta : undefined;
+  for (const value of [entry.context_length, entry.max_model_len, meta?.context_length]) {
+    const contextWindow = readPositiveIntegerish(value);
+    if (contextWindow !== undefined && Number.isSafeInteger(contextWindow)) return { contextWindow };
+  }
+  return undefined;
 }
 
 function mergeDefaults(...defaults: Array<DiscoveryDefaults | undefined>): DiscoveryDefaults | undefined {
@@ -392,7 +405,7 @@ function parseOpenAIModelEntries(entries: OpenAIModelEntry[], responseBaseUrl?: 
     const tags = readTags(entry.tags);
     if (tags) model.tags = tags;
     const cloudflareProperties = readCloudflareProperties(entry.properties);
-    const defaults = mergeDefaults(readSupportsDefaults(entry.supports), cloudflareProperties.defaults);
+    const defaults = mergeDefaults(readSupportsDefaults(entry.supports), cloudflareProperties.defaults, readContextDefaults(entry));
     if (defaults) model.defaults = defaults;
     const catalogLookupIds = readCatalogLookupIds(entry, id);
     if (catalogLookupIds) model.catalogLookupIds = catalogLookupIds;

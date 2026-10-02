@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Discover effective OpenAI-compatible context limits from `context_length`, `max_model_len`, or `meta.context_length`; refreshed limits replace cached values while explicit overrides retain priority.
 - Added an opt-in per-provider `allowPrivateHttp` flag that permits plain `http:` base URLs on private-network IPv4 addresses (RFC 1918). Default is off; public hosts and metadata-service hosts are unchanged.
 
 ### Fixed
