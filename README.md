@@ -6,8 +6,6 @@
 [![License](https://img.shields.io/github/license/MasuRii/pi-model-discovery?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=for-the-badge)]()
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Y8Y01PSSVR)
-
 `pi-model-discovery` is a Pi extension that discovers provider models, enriches metadata, caches results, and registers them dynamically with `pi.registerProvider()` for `/scoped-models` and the `/pi-model-discovery` catalog.
 
 </div>
