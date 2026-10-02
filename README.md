@@ -12,6 +12,20 @@
 
 </div>
 
+## Changes in this fork
+
+The `cashxcode/pi-model-discovery` **`remote-host-support` branch** adds the following to upstream 0.3.0. These changes are not published in the upstream npm package; use the branch-specific installation below.
+
+| Change | Behavior |
+| --- | --- |
+| LAN HTTP opt-in | Per-provider `allowPrivateHttp: true` permits RFC 1918 IPv4 endpoints. Localhost defaults remain unchanged. |
+| Server context discovery | Reads `context_length`, then `max_model_len`, then `meta.context_length`, using the first valid positive safe integer (including numeric strings). |
+| Updated context limits | Successful discovery replaces cached limits in either direction. Explicit model/provider overrides still take priority. |
+| Loopback validation | DNS names beginning with `127.` no longer qualify as IPv4 loopback. |
+| Standalone development | Removes machine-specific TypeScript paths and repairs the dependency lockfile. |
+
+The implementation passed 148 automated tests. Manual testing confirmed remote mlx-serve access and a 1,048,576-token context displayed as `1.0M` in a new Pi session. This verifies discovery and display, not inference at the full context capacity. See [Changelog](CHANGELOG.md) for the change list.
+
 ## Features
 
 - Auto-imports eligible provider definitions from `agent/models.json` and active API-key credentials from `agent/auth.json`.
@@ -33,13 +47,33 @@ pi install git:github.com/cashxcode/pi-model-discovery@remote-host-support
 
 If replacing the npm version, back up its `config.json` outside the package directory first, then run `pi remove npm:pi-model-discovery` to avoid loading both copies. Restore your config in the fork’s extension directory and add `allowPrivateHttp` to the LAN provider as shown below. The npm package and upstream repository commands below install the original release.
 
-### npm package
+Git packages correctly install at:
+
+```text
+~/.pi/agent/git/github.com/cashxcode/pi-model-discovery/
+```
+
+Leave the clone there. The `~/.pi/agent/npm/node_modules/` layout is for npm packages. Run `pi list` to inspect registered packages; if removal reports “No matching package found,” check that list rather than moving folders manually.
+
+### Updating this fork
+
+Back up your local configuration outside the checkout, quit Pi, and update the branch:
+
+```bash
+cp ~/.pi/agent/git/github.com/cashxcode/pi-model-discovery/config.json \
+  ~/.pi/agent/pi-model-discovery.config.backup.json
+git -C ~/.pi/agent/git/github.com/cashxcode/pi-model-discovery pull --ff-only
+```
+
+The copy command assumes a config already exists and replaces that backup file. Use a different backup filename if retaining an earlier backup. If Git reports local changes or a non-fast-forward update, resolve that before proceeding; do not force-reset the checkout. Restart Pi after updating code. Keep the external config backup: Pi's package reconciliation can reset and clean Git checkouts, including ignored local files.
+
+### npm package (upstream)
 
 ```bash
 pi install npm:pi-model-discovery
 ```
 
-### Git repository
+### Git repository (upstream)
 
 ```bash
 pi install git:github.com/MasuRii/pi-model-discovery
@@ -107,7 +141,7 @@ For Pi on a laptop connecting to an OpenAI-compatible LAN server, add an explici
       "allowPrivateHttp": true,
       "api": "openai-completions",
       "apiKey": "${MLX_SERVE_API_KEY}",
-      "discovery": { "type": "openai-compat" }
+      "discovery": { "type": "openai-compat", "ttlMs": 60000 }
     }
   ]
 }
@@ -115,11 +149,66 @@ For Pi on a laptop connecting to an OpenAI-compatible LAN server, add an explici
 
 Replace the example IP with your server's LAN IPv4 address and set `MLX_SERVE_API_KEY` in the environment that launches Pi. The server must listen on its LAN interface, and its port must be reachable from the laptop. Restart Pi or run `/reload`, then use `/pi-model-discovery` and `/model` to inspect and select a discovered model.
 
+For the global Git installation, save the complete JSON object above as:
+
+```text
+~/.pi/agent/git/github.com/cashxcode/pi-model-discovery/config.json
+```
+
+On macOS with zsh, set the same key the server expects in `~/.zshenv`:
+
+```bash
+export MLX_SERVE_API_KEY="your-actual-server-key"
+```
+
+Keep the quotes. Open a new terminal, or run `source ~/.zshenv`, then launch Pi from that terminal. Check availability without printing the secret:
+
+```bash
+if [ -n "$MLX_SERVE_API_KEY" ]; then echo "API key is set"; else echo "API key is missing"; fi
+```
+
+Validate the config after editing, especially when removing overrides (JSON does not allow trailing commas):
+
+```bash
+python3 -m json.tool \
+  ~/.pi/agent/git/github.com/cashxcode/pi-model-discovery/config.json \
+  >/dev/null && echo "Config is valid"
+```
+
 `allowPrivateHttp` must be the JSON boolean `true`, applies only to that explicit provider, and defaults to `false`. Auto-import does not opt in; define an explicit provider with the same ID to override it. Private DNS names (including `.local`), private IPv6, and public HTTP endpoints are not enabled by this option. Existing localhost, IPv4 loopback, IPv6 loopback, and HTTPS configurations need no changes.
+
+### Context discovery and settings changes
 
 OpenAI-compatible discovery reads a positive context window from `context_length`, then `max_model_len`, then `meta.context_length`. This includes mlx-serve's effective configured limit. `meta.model_max_tokens` is not interpreted as an output-token limit. Missing or invalid values leave the existing catalog/cache/default fallback behavior intact.
 
 To follow server settings automatically, remove that model's `contextWindow` from `modelDefaults` and any provider-level `defaults.contextWindow`; explicit overrides take priority. Successful discovery refreshes replace previously cached context limits, including decreases. Discovery runs on startup or `/reload` when the provider cache has expired. With `ttlMs: 60000`, wait at least a minute after the previous successful discovery, then restart Pi or run `/reload`. This is not continuous polling; cached values can appear briefly while the background refresh completes. Cache-only mode and failed requests retain cached metadata.
+
+After changing the server's context setting:
+
+1. Remove any `contextWindow` override for that model (and any provider-level context override) if the server should control the value.
+2. Wait for cache expiry: the example uses 60 seconds after the previous successful discovery; the general default is two hours.
+3. Run `/reload` and allow background discovery to finish.
+4. Start a **new session with `/new`**, then select the model with `/model`. In manual testing, the existing session retained its previous context display until `/new`. Save or finish ongoing work before starting a new session.
+
+The extension reads the server's API response; it does not read mlx-serve's `model-settings.json` or change server settings. A changed UI setting must be reflected in `/v1/models` before discovery can observe it. No assumption is made that unloaded models advertise the same effective limits as loaded models.
+
+### Troubleshooting context values
+
+- **All models show 128k:** validate `config.json`, verify `pi list` points to the fork, and confirm the cache was refreshed. 128,000 is the fallback when no usable context metadata is available.
+- **A value stays fixed:** check for explicit `modelDefaults` or `defaults.contextWindow` overrides.
+- **The cache is correct but the footer is stale:** allow refresh to finish and use `/new`. The footer's `(auto)` means automatic compaction, not automatic discovery.
+- **The cache differs from the server:** compare its `fetchedAt` time with a fresh server response; inspect the configured provider URL and discovery endpoint. `/pi-model-discovery` views the catalog but does not force a refresh.
+- **Some models have no limit:** server entries without context fields can retain catalog/cache metadata or the 128,000 fallback. `meta.model_max_tokens` is deliberately not used as a context or generation limit.
+
+To inspect server-advertised metadata from the client, substitute your server's address below. The command sends the key without printing it:
+
+```bash
+curl --fail --silent --show-error \
+  -H "Authorization: Bearer ${MLX_SERVE_API_KEY}" \
+  http://192.168.1.20:11234/v1/models | python3 -m json.tool
+```
+
+### Transport and other provider settings
 
 HTTP sends API keys, prompts, and responses without encryption. Use this option only on a trusted network; use HTTPS or an SSH tunnel for encrypted transport. This flag validates the configured base URL; it is not a network firewall or a redirect policy.
 

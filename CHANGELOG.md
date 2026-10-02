@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Discover effective OpenAI-compatible context limits from `context_length`, `max_model_len`, or `meta.context_length`; refreshed limits replace cached values while explicit overrides retain priority.
 - Added an opt-in per-provider `allowPrivateHttp` flag that permits plain `http:` base URLs on private-network IPv4 addresses (RFC 1918). Default is off; public hosts and metadata-service hosts are unchanged.
 
+### Documentation
+- Summarize fork additions and document branch installation, Git package paths, configuration, API-key setup, JSON validation, and updates.
+- Document cache expiry, explicit context override precedence, and the observed need for `/new` after discovery refresh to update an existing session’s context display.
+- Add troubleshooting guidance and correct the example configuration’s HTTP policy description.
+
 ### Fixed
 - Restrict the IPv4 loopback exception to actual IP addresses instead of hostnames beginning with `127.`.
 - Use local TypeScript dependencies and synchronize the lockfile with existing dependency overrides so a fresh clone can run checks.

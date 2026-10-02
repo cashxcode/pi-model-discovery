@@ -1,6 +1,6 @@
 {
   "debug": false,
-  "$comment": "Security: http:// baseUrl values are accepted only for localhost/127.x/::1 development endpoints; use https:// for remote providers. autoImport can use built-in read-only profiles for supported auth-only credentials (NVIDIA, Cloudflare, Cerebras, Qwen, Xiaomi, Cline, Kilo).",
+  "$comment": "Security: http:// baseUrl values are accepted only for localhost/127.x/::1 development endpoints by default. Explicit providers may opt in to RFC 1918 IPv4 HTTP with allowPrivateHttp: true; otherwise use https:// for remote providers. See README for LAN setup and context refresh instructions. autoImport can use built-in read-only profiles for supported auth-only credentials (NVIDIA, Cloudflare, Cerebras, Qwen, Xiaomi, Cline, Kilo).",
   "cacheTTL": 7200000,
   "registration": {
     "importMode": "replace"
